@@ -1,0 +1,1 @@
+# HA Narodmon Sender\nSee README_RU.md for full instructions in Russian.\n

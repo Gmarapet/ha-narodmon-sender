@@ -1,0 +1,3 @@
+send_data:
+  name: "Send data to Narodmon"
+  description: "Forces immediate sending of current sensor data to Narodmon.ru"
