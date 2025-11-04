@@ -13,10 +13,14 @@ from .const import DOMAIN, CONF_ALTITUDE, CONF_MAC_ADDRESS
 
 _LOGGER = logging.getLogger(__name__)
 
+CONF_UPDATE_INTERVAL = "update_interval"
+DEFAULT_UPDATE_INTERVAL = 360
+
+
 def get_mac_address() -> str:
     """Return MAC address of current machine in format XX:XX:XX:XX:XX:XX."""
     mac = uuid.getnode()
-    mac_str = ':'.join(f'{(mac >> ele) & 0xff:02x}' for ele in range(40, -1, -8))
+    mac_str = ":".join(f"{(mac >> ele) & 0xff:02x}" for ele in range(40, -1, -8))
     return mac_str
 
 
@@ -26,13 +30,13 @@ class NarodmonSenderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step."""
+        """Handle the initial setup."""
         errors = {}
 
         if user_input is not None:
             return self.async_create_entry(title="HA Narodmon Sender", data=user_input)
 
-        # Берём значения по умолчанию из Home Assistant и сети
+        # Defaults
         default_lat = self.hass.config.latitude
         default_lon = self.hass.config.longitude
         default_alt = getattr(self.hass.config, "elevation", 0.0)
@@ -44,6 +48,9 @@ class NarodmonSenderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_LONGITUDE, default=default_lon): vol.Coerce(float),
                 vol.Optional(CONF_ALTITUDE, default=default_alt): vol.Coerce(float),
                 vol.Optional(CONF_MAC_ADDRESS, default=default_mac): str,
+                vol.Optional(CONF_UPDATE_INTERVAL, default=DEFAULT_UPDATE_INTERVAL): vol.All(
+                    vol.Coerce(int), vol.Range(min=60, max=86400)
+                ),
             }
         )
 
@@ -52,7 +59,7 @@ class NarodmonSenderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        """Return the options flow handler."""
+        """Return options flow handler."""
         return NarodmonSenderOptionsFlow(config_entry)
 
 
@@ -63,15 +70,15 @@ class NarodmonSenderOptionsFlow(config_entries.OptionsFlow):
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        """Manage the options."""
+        """Manage options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        # Берём текущие настройки или значения по умолчанию
         default_lat = self.config_entry.data.get(CONF_LATITUDE, self.hass.config.latitude)
         default_lon = self.config_entry.data.get(CONF_LONGITUDE, self.hass.config.longitude)
         default_alt = self.config_entry.data.get(CONF_ALTITUDE, getattr(self.hass.config, "elevation", 0.0))
         default_mac = self.config_entry.data.get(CONF_MAC_ADDRESS, get_mac_address())
+        default_interval = self.config_entry.data.get(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
 
         data_schema = vol.Schema(
             {
@@ -79,6 +86,9 @@ class NarodmonSenderOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(CONF_LONGITUDE, default=default_lon): vol.Coerce(float),
                 vol.Optional(CONF_ALTITUDE, default=default_alt): vol.Coerce(float),
                 vol.Optional(CONF_MAC_ADDRESS, default=default_mac): str,
+                vol.Optional(CONF_UPDATE_INTERVAL, default=default_interval): vol.All(
+                    vol.Coerce(int), vol.Range(min=60, max=86400)
+                ),
             }
         )
 
