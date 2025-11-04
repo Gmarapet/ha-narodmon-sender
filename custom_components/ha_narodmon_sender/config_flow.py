@@ -1,82 +1,85 @@
+"""Config flow for HA Narodmon Sender integration."""
+from __future__ import annotations
+
+import logging
 import uuid
 import voluptuous as vol
+
 from homeassistant import config_entries
-from homeassistant.helpers.selector import selector
-from .const import (
-    DOMAIN, CONF_MAC, CONF_INTERVAL, CONF_GROUPS, CONF_LATITUDE, CONF_LONGITUDE, CONF_ELEVATION,
-    DEFAULT_INTERVAL, SUPPORTED_GROUPS, AGGREGATION_MODES
-)
+from homeassistant.const import CONF_LATITUDE, CONF_LONGITUDE
+from homeassistant.core import callback
 
-GROUP_KEYS = list(SUPPORTED_GROUPS.keys())
+from .const import DOMAIN, CONF_ALTITUDE, CONF_MAC_ADDRESS
 
-class NarodmonConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+_LOGGER = logging.getLogger(__name__)
+
+def get_mac_address() -> str:
+    """Return MAC address of current machine in format XX:XX:XX:XX:XX:XX."""
+    mac = uuid.getnode()
+    mac_str = ':'.join(f'{(mac >> ele) & 0xff:02x}' for ele in range(40, -1, -8))
+    return mac_str
+
+
+class NarodmonSenderConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for HA Narodmon Sender."""
+
     VERSION = 1
 
     async def async_step_user(self, user_input=None):
+        """Handle the initial step."""
+        errors = {}
+
         if user_input is not None:
-            return await self.async_step_groups(user_input)
+            return self.async_create_entry(title="HA Narodmon Sender", data=user_input)
 
-        ha_lat = round(self.hass.config.latitude or 0.0, 6)
-        ha_lon = round(self.hass.config.longitude or 0.0, 6)
-        ha_alt = round(getattr(self.hass.config, "elevation", 0.0) or 0.0, 2)
-        default_mac = uuid.uuid4().hex[:12].upper()
+        # Берём значения по умолчанию из Home Assistant и сети
+        default_lat = self.hass.config.latitude
+        default_lon = self.hass.config.longitude
+        default_alt = getattr(self.hass.config, "elevation", 0.0)
+        default_mac = get_mac_address()
 
-        schema = vol.Schema({
-            vol.Required(CONF_MAC, default=default_mac): str,
-            vol.Optional(CONF_INTERVAL, default=DEFAULT_INTERVAL): int,
-            vol.Optional(CONF_LATITUDE, default=ha_lat): float,
-            vol.Optional(CONF_LONGITUDE, default=ha_lon): float,
-            vol.Optional(CONF_ELEVATION, default=ha_alt): float,
-        })
-        return self.async_show_form(step_id="user", data_schema=schema)
+        data_schema = vol.Schema(
+            {
+                vol.Optional(CONF_LATITUDE, default=default_lat): vol.Coerce(float),
+                vol.Optional(CONF_LONGITUDE, default=default_lon): vol.Coerce(float),
+                vol.Optional(CONF_ALTITUDE, default=default_alt): vol.Coerce(float),
+                vol.Optional(CONF_MAC_ADDRESS, default=default_mac): str,
+            }
+        )
 
-    async def async_step_groups(self, base_config):
-        self._base_config = base_config
-        self._base_config.setdefault(CONF_GROUPS, [])
-        self._base_config.setdefault(CONF_CUSTOM, [])
-        return await self.async_step_group_item()
-
-    async def async_step_group_item(self, user_input=None):
-        if user_input is not None:
-            groups = self._base_config.get(CONF_GROUPS, [])
-            groups.append(user_input)
-            self._base_config[CONF_GROUPS] = groups
-            if "add_another" in user_input and user_input.get("add_another"):
-                return await self.async_step_group_item()
-            return self.async_create_entry(title="HA Narodmon Sender", data=self._base_config)
-
-        schema = vol.Schema({
-            vol.Required("group_key", default=GROUP_KEYS[0]): vol.In(GROUP_KEYS),
-            vol.Required("sensors"): selector({"entity": {"domain": "sensor", "multiple": True}}),
-            vol.Required("aggregation", default="average"): selector({"select": {"options": AGGREGATION_MODES}}),
-            vol.Optional("add_another", default=False): bool,
-        })
-        return self.async_show_form(step_id="group_item", data_schema=schema)
-
-    async def async_step_custom(self, user_input=None):
-        if user_input is not None:
-            customs = self._base_config.get(CONF_CUSTOM, [])
-            customs.append(user_input)
-            self._base_config[CONF_CUSTOM] = customs
-            if user_input.get("add_another"):
-                return await self.async_step_custom()
-            return self.async_create_entry(title="HA Narodmon Sender", data=self._base_config)
-
-        schema = vol.Schema({
-            vol.Required("identifier"): str,
-            vol.Required("sensors"): selector({"entity": {"domain": "sensor", "multiple": True}}),
-            vol.Optional("add_another", default=False): bool,
-        })
-        return self.async_show_form(step_id="custom", data_schema=schema)
+        return self.async_show_form(step_id="user", data_schema=data_schema, errors=errors)
 
     @staticmethod
+    @callback
     def async_get_options_flow(config_entry):
-        return NarodmonOptionsFlowHandler(config_entry)
+        """Return the options flow handler."""
+        return NarodmonSenderOptionsFlow(config_entry)
 
 
-class NarodmonOptionsFlowHandler(config_entries.OptionsFlow):
+class NarodmonSenderOptionsFlow(config_entries.OptionsFlow):
+    """Handle options for HA Narodmon Sender."""
+
     def __init__(self, config_entry):
         self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
-        return self.async_abort(reason="not_implemented")
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        # Берём текущие настройки или значения по умолчанию
+        default_lat = self.config_entry.data.get(CONF_LATITUDE, self.hass.config.latitude)
+        default_lon = self.config_entry.data.get(CONF_LONGITUDE, self.hass.config.longitude)
+        default_alt = self.config_entry.data.get(CONF_ALTITUDE, getattr(self.hass.config, "elevation", 0.0))
+        default_mac = self.config_entry.data.get(CONF_MAC_ADDRESS, get_mac_address())
+
+        data_schema = vol.Schema(
+            {
+                vol.Optional(CONF_LATITUDE, default=default_lat): vol.Coerce(float),
+                vol.Optional(CONF_LONGITUDE, default=default_lon): vol.Coerce(float),
+                vol.Optional(CONF_ALTITUDE, default=default_alt): vol.Coerce(float),
+                vol.Optional(CONF_MAC_ADDRESS, default=default_mac): str,
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=data_schema)
