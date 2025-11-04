@@ -1,10 +1,10 @@
 {
   "name": "HA Narodmon Sender",
-  "content_in_root": false,
-  "domains": [
-    "sensor"
-  ],
+  "domain": "ha_narodmon_sender",
+  "country": "RU",
   "homeassistant": "2024.1.0",
   "render_readme": true,
-  "country": "RU"
+  "iot_class": "cloud_push",
+  "filename": "custom_components/ha_narodmon_sender/__init__.py",
+  "categories": ["integration"]
 }
