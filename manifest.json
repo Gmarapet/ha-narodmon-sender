@@ -2,8 +2,8 @@
   "domain": "ha_narodmon_sender",
   "name": "HA Narodmon Sender",
   "version": "0.0.1",
-  "documentation": "https://github.com/Gmarapet/hass-narodmon-sender",
-  "issue_tracker": "https://github.com/Gmarapet/hass-narodmon-sender/issues",
+  "documentation": "https://github.com/Gmarapet/ha-narodmon-sender",
+  "issue_tracker": "https://github.com/Gmarapet/ha-narodmon-sender/issues",
   "dependencies": [],
   "codeowners": [
     "@Gmarapet"
